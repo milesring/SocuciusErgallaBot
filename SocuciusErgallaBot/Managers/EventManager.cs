@@ -37,7 +37,7 @@ namespace SocuciusErgallaBot.Managers
         private static async Task _client_UserVoiceStateUpdated(SocketUser arg1, SocketVoiceState arg2, SocketVoiceState arg3)
         {
             //bot leave timer is running but joined a new voice channel
-            if(_stopMusicTimer?.Enabled == true && arg2.VoiceChannel != null && arg3.VoiceChannel != null)
+            if(arg1.IsBot && _stopMusicTimer?.Enabled == true && arg3.VoiceChannel != null)
             {
                 await StopLeaveChannelTimer();
             }
