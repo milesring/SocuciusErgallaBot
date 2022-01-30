@@ -137,13 +137,15 @@ namespace SocuciusErgallaBot.Managers
                 _stopMusicTimer = new(leaveBuffer);
                 _stopMusicTimer.AutoReset = false;
                 _stopMusicTimer.Elapsed += async (sender, e) =>
-                {
-                    Console.WriteLine($"Leave timer elapsed.");
-                    await AudioManager.LeaveAsync(voiceChannel, guild);
+                {      
+                    var response = await AudioManager.LeaveAsync(voiceChannel, guild);
+                    if(response.Status == MusicResponseStatus.Valid)
+                    {
+                        await SetNowPlayingTimer();
+                    }
                 };
             }
             _stopMusicTimer.Start();
-            Console.WriteLine($"Leave timer started");
             return Task.CompletedTask;
         }
 
@@ -151,7 +153,6 @@ namespace SocuciusErgallaBot.Managers
         {
             if (_stopMusicTimer.Enabled)
             {
-                Console.WriteLine("Leave timer stopped");
                 _stopMusicTimer.Stop();
             }
             return Task.CompletedTask;

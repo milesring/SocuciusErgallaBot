@@ -65,6 +65,7 @@ namespace SocuciusErgallaBot.Modules
             {
                 await EventManager.SetNowPlayingTimer();
             }
+            await Context.Channel.SendMessageAsync($"{response.Message}");
         }
 
         [Command("volume")]
@@ -74,7 +75,8 @@ namespace SocuciusErgallaBot.Modules
         {
             var guild = GetMutualGuild();
             var voiceChannel = guild.VoiceChannels.Where(x => x.Users.Any(y => y.Id == Context.Message.Author.Id)).FirstOrDefault();
-            await AudioManager.SetVolumeAsync(voiceChannel, guild, volume);
+            var response = await AudioManager.SetVolumeAsync(voiceChannel, guild, volume);
+            await Context.Channel.SendMessageAsync($"{response.Message}");
         }
 
         [Command("next")]
@@ -98,7 +100,8 @@ namespace SocuciusErgallaBot.Modules
         {
             var guild = GetMutualGuild();
             var voiceChannel = guild.VoiceChannels.Where(x => x.Users.Any(y => y.Id == Context.Message.Author.Id)).FirstOrDefault();
-            await AudioManager.TogglePauseAsync(voiceChannel, GetMutualGuild());
+            var response = await AudioManager.TogglePauseAsync(voiceChannel, GetMutualGuild());
+            await Context.Channel.SendMessageAsync($"{response.Message}");
         }
 
         [Command("queue")]
@@ -128,8 +131,8 @@ namespace SocuciusErgallaBot.Modules
         {
             var guild = GetMutualGuild();
             var voiceChannel = guild.VoiceChannels.Where(x => x.Users.Any(y => y.Id == Context.Message.Author.Id)).FirstOrDefault();
-            var msg = await AudioManager.RemoveTrackAsync(voiceChannel ,guild, trackNumber);
-            await Context.Channel.SendMessageAsync(msg.Message);
+            var response = await AudioManager.RemoveTrackAsync(voiceChannel ,guild, trackNumber);
+            await Context.Channel.SendMessageAsync($"{response.Message}");
         }
     }
 }
