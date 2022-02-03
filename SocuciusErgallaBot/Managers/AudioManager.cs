@@ -108,7 +108,7 @@ namespace SocuciusErgallaBot.Managers
 
         }
 
-        public static async Task<MusicResponse> PlayAsync(IVoiceChannel voiceChannel, IGuild guild, string query)
+        public static async Task<MusicResponse> PlayAsync(IVoiceChannel voiceChannel, IGuild guild, string query, SocketUser user)
         {
             //check if caller is in voice channel
             if (voiceChannel is null)
@@ -170,6 +170,20 @@ namespace SocuciusErgallaBot.Managers
                         StartTime = startTime
                     };
                     _queuedTracks.Add(newTrackInfo);
+
+                    //add to database
+                    await DatabaseManager.InsertTrackPlayAsync(new Models.TrackHistory()
+                    {
+                        Title = track.Title,
+                        Author = track.Author,
+                        URL = track.Url, 
+                        User = new Models.User()
+                        {
+                            Username = user.Username,
+                            DiscordId = user.Id.ToString()
+                        }
+                    });
+
                     Console.WriteLine($"({DateTime.Now}\t(AUDIO)\tTrack was added to queue");
                     return new MusicResponse()
                     {
@@ -182,6 +196,19 @@ namespace SocuciusErgallaBot.Managers
                 await player.PlayAsync(track);
                 //seek to starttime, zero by default
                 await player.SeekAsync(startTime);
+
+                //add to database
+                await DatabaseManager.InsertTrackPlayAsync(new Models.TrackHistory()
+                {
+                    Title = track.Title,
+                    Author = track.Author,
+                    URL = track.Url,
+                    User = new Models.User()
+                    {
+                        Username = user.Username,
+                        DiscordId = user.Id.ToString()
+                    }
+                });
                 return new MusicResponse()
                 {
                     Message = $"{track.Title} - {track.Author} at {startTime:c}",
@@ -275,9 +302,7 @@ namespace SocuciusErgallaBot.Managers
                     Status = MusicResponseStatus.Error
                 };
             }
-        }
-
-        
+        } 
 
         public static async Task<MusicResponse> SetVolumeAsync(IVoiceChannel voiceChannel, IGuild guild, int volume)
         {
@@ -451,7 +476,7 @@ namespace SocuciusErgallaBot.Managers
                 {
                     return Task.FromResult("Nothing currently playing.");
                 }
-                return Task.FromResult($"\nNow playing: {track.Title} - {track.Author}\n\t{track.Position} - {track.Duration}\n\t{track.Url}");
+                return Task.FromResult($"\nNow playing: {track.Title} - {track.Author}\n\t{track.Position:c} - {track.Duration:c}\n\t{track.Url}");
             }
             catch (Exception)
             {

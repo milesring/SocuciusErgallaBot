@@ -47,7 +47,7 @@ namespace SocuciusErgallaBot.Modules
             }
             var guild = GetMutualGuild();
             var voiceChannel = guild.VoiceChannels.Where(x => x.Users.Any(y => y.Id == Context.Message.Author.Id)).First();
-            var response = await AudioManager.PlayAsync(voiceChannel, guild, search);
+            var response = await AudioManager.PlayAsync(voiceChannel, guild, search, Context.Message.Author);
             EventManager.StopNowPlayingTimer();
             await Context.Channel.SendMessageAsync($"{response.Message}");
         }
@@ -133,6 +133,15 @@ namespace SocuciusErgallaBot.Modules
             var voiceChannel = guild.VoiceChannels.Where(x => x.Users.Any(y => y.Id == Context.Message.Author.Id)).FirstOrDefault();
             var response = await AudioManager.RemoveTrackAsync(voiceChannel ,guild, trackNumber);
             await Context.Channel.SendMessageAsync($"{response.Message}");
+        }
+
+        [Command("toptracks")]
+        [Alias("top")]
+        [Summary("Lists top tracks played by the bot")]
+        public async Task TopTracksCommand()
+        {
+            var tracks = await DatabaseManager.GetTrackHistoriesAsync();
+
         }
     }
 }

@@ -43,5 +43,9 @@ namespace SocuciusErgallaBot.Managers
         //prefix used in calling commands. !m, !bot, bot, etc.
         [JsonProperty("prefix")]
         public string Prefix { get; private set; }
+        //name of database
+        [JsonProperty("historydatabase")]
+        public string HistoryDatabase { get; private set; }
+
     }
 }
