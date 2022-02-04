@@ -46,24 +46,46 @@ namespace SocuciusErgallaBot.Managers
 
         public static async Task<List<TrackHistory>> GetTrackHistoriesAsync()
         {
-            //TODO: Fill out trackhistory from ALL TABLES
             await CreateTables();
-            await _connection.OpenAsync();
-            var command = _connection.CreateCommand();
-            command.CommandText = $"SELECT * FROM {_trackTableName}";
-            var reader = await command.ExecuteReaderAsync();
-            List<TrackHistory> trackHistories = new();
-            while (await reader.ReadAsync())
+            using (_connection = new SQLiteConnection(ConfigManager.Config.HistoryDatabase))
             {
-                var trackHistory = new TrackHistory();
-                trackHistory.Title = reader.GetString(reader.GetOrdinal($"{nameof(TrackHistory.Title).ToLower()}"));
-                trackHistory.Author = reader.GetString(reader.GetOrdinal($"{nameof(TrackHistory.Author).ToLower()}"));
-                trackHistory.URL = reader.GetString(reader.GetOrdinal($"{nameof(TrackHistory.URL).ToLower()}"));
-                trackHistories.Add(trackHistory);
+                await _connection.OpenAsync();
+                var command = _connection.CreateCommand();
+                command.CommandText = $"SELECT {nameof(TrackHistory.Id).ToLower()}, {nameof(TrackHistory.Title).ToLower()}, {nameof(TrackHistory.Author).ToLower()}, {nameof(TrackHistory.URL).ToLower()} FROM {_trackTableName}";
+                List<TrackHistory> trackHistories = new();
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        var trackHistory = new TrackHistory();
+                        trackHistory.Id = reader.GetInt32(reader.GetOrdinal($"{nameof(TrackHistory.Id).ToLower()}"));
+                        trackHistory.Title = reader.GetString(reader.GetOrdinal($"{nameof(TrackHistory.Title).ToLower()}"));
+                        trackHistory.Author = reader.GetString(reader.GetOrdinal($"{nameof(TrackHistory.Author).ToLower()}"));
+                        trackHistory.URL = reader.GetString(reader.GetOrdinal($"{nameof(TrackHistory.URL).ToLower()}"));
+                        trackHistories.Add(trackHistory);
+                    }
+                }
+
+                command.CommandText = $"SELECT " +
+                    $"{nameof(TrackHistory).ToLower()}_{nameof(TrackHistory.Id).ToLower()}, " +
+                    $"COUNT({nameof(TrackHistory).ToLower()}_{nameof(TrackHistory.Id).ToLower()}) AS {nameof(TrackHistory.Plays)} " +
+                    $"FROM {_userPlaysTableName} " +
+                    $"GROUP BY " +
+                    $"{nameof(TrackHistory).ToLower()}_{nameof(TrackHistory.Id).ToLower()}";
+                using (var reader = await command.ExecuteReaderAsync())
+                {
+                    while (await reader.ReadAsync())
+                    {
+                        int id = reader.GetInt32(reader.GetOrdinal($"{nameof(TrackHistory).ToLower()}_{nameof(TrackHistory.Id).ToLower()}"));
+                        int plays = reader.GetInt32(reader.GetOrdinal(nameof(TrackHistory.Plays)));
+                        trackHistories.Where(x => x.Id == id).First().Plays = plays;
+                    }
+                }
+                await _connection.CloseAsync();
+                return trackHistories;
             }
-            await _connection.CloseAsync();
-            return trackHistories;
         }
+
         public static async Task<TrackHistory> GetTrackHistoryAsync(TrackHistory trackHistory)
         {
             await CreateTables();
@@ -84,7 +106,7 @@ namespace SocuciusErgallaBot.Managers
                     }
                 }
                 //Get previous track info based on title and author. In the case where user submitted a shortened youtube link vs full
-                command.CommandText = $"SELECT * FROM {_trackTableName} WHERE title = $title AND author = $author";
+                command.CommandText = $"SELECT * FROM {_trackTableName} WHERE {nameof(TrackHistory.Title).ToLower()} = $title AND {nameof(TrackHistory.Author).ToLower()} = $author";
                 command.Parameters.AddWithValue("$title", trackHistory.Title);
                 command.Parameters.AddWithValue("$author", trackHistory.Author);
                 using (var reader = await command.ExecuteReaderAsync())
@@ -100,6 +122,7 @@ namespace SocuciusErgallaBot.Managers
             }
 
         }
+
         public static async Task<User> GetUserHistoryAsync(User user)
         {
             await CreateTables();
@@ -124,7 +147,7 @@ namespace SocuciusErgallaBot.Managers
         public static async Task InsertTrackPlayAsync(TrackHistory trackHistory)
         {
             await CreateTables();
-            
+
             //User Info
             await GetUserHistoryAsync(trackHistory.User);
             if (trackHistory.User.Id == 0)
@@ -170,6 +193,7 @@ namespace SocuciusErgallaBot.Managers
                 await command.ExecuteNonQueryAsync();
             }
         }
+
         private static async Task AssignTrackInfo(TrackHistory trackHistory, System.Data.Common.DbDataReader reader)
         {
             while (await reader.ReadAsync())

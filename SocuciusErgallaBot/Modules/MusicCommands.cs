@@ -13,6 +13,8 @@ namespace SocuciusErgallaBot.Modules
     [Name("Music")]
     public class MusicCommands : ModuleBase<SocketCommandContext>
     {
+        private Random random = new Random();
+
         [Command("join")]
         [Summary("Instructs the bot to join the voice channel you are in")]
         public async Task JoinCommand()
@@ -39,17 +41,22 @@ namespace SocuciusErgallaBot.Modules
         [Summary("Plays a video from youtube using a url or search terms")]
         public async Task PlayCommand([Remainder] string search)
         {
+            var response = await PlayTrack(search);
+            await Context.Channel.SendMessageAsync($"{response.Message}");
+        }
+
+        private async Task<MusicResponse> PlayTrack(string search)
+        {
             var joinResponse = await JoinVoiceChannelAsync();
             if (joinResponse.Status == MusicResponseStatus.Error)
             {
-                await Context.Channel.SendMessageAsync($"Error: {joinResponse.Message}");
-                return;
+                return joinResponse;
             }
             var guild = GetMutualGuild();
             var voiceChannel = guild.VoiceChannels.Where(x => x.Users.Any(y => y.Id == Context.Message.Author.Id)).First();
             var response = await AudioManager.PlayAsync(voiceChannel, guild, search, Context.Message.Author);
             EventManager.StopNowPlayingTimer();
-            await Context.Channel.SendMessageAsync($"{response.Message}");
+            return response;
         }
 
         [Command("leave")]
@@ -141,7 +148,24 @@ namespace SocuciusErgallaBot.Modules
         public async Task TopTracksCommand()
         {
             var tracks = await DatabaseManager.GetTrackHistoriesAsync();
+            tracks = tracks.OrderBy(x => x.Plays).Take(10).ToList();
+            string topTracks = string.Empty;
+            for (int i = 0; i < tracks.Count; i++)
+            {
+                topTracks += $"{i + 1}. {tracks[i].Title}\n\tPlays: {tracks[i].Plays}\n\t\t{tracks[i].URL}\n";
+            }
+            await Context.Channel.SendMessageAsync($"Top Tracks:\n\n{topTracks}");
+        }
 
+        [Command("random")]
+        [Alias("rand")]
+        [Summary("Plays a random track that has been played before")]
+        public async Task RandomTrackCommand()
+        {
+            var tracks = await DatabaseManager.GetTrackHistoriesAsync();
+            var track = tracks[random.Next(tracks.Count)];
+            var response = await PlayTrack(track.URL);
+            await Context.Channel.SendMessageAsync($"{response.Message}");
         }
     }
 }
