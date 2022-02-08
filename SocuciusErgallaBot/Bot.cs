@@ -43,7 +43,7 @@ namespace SocuciusErgallaBot
             {
                 return;
             }
-
+            
             await CommandManager.LoadCommandsAsync();
             await EventManager.LoadCommands();
 

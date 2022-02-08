@@ -31,6 +31,7 @@ namespace SocuciusErgallaBot.Managers
             _client.Ready += OnReady;
             _client.MessageReceived += OnMessageReceived;
             _client.UserVoiceStateUpdated += _client_UserVoiceStateUpdated;
+            _client.SlashCommandExecuted += SlashCommandManager.HandleSlashCommand;
             return Task.CompletedTask;
         }
 
@@ -97,8 +98,10 @@ namespace SocuciusErgallaBot.Managers
                 throw;
             }
 
+            await SlashCommandManager.LoadSlashCommands(_client.Guilds.First().Id);
+
             Console.WriteLine($"({DateTime.Now})\t (READY)\tBot is ready.");
-            await _client.SetStatusAsync(Discord.UserStatus.Online);
+            await _client.SetStatusAsync(UserStatus.Online);
             await SetNowPlayingTimer();
         }
 

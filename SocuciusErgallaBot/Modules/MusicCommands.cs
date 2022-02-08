@@ -2,11 +2,6 @@
 using Discord.Commands;
 using Discord.WebSocket;
 using SocuciusErgallaBot.Managers;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SocuciusErgallaBot.Modules
 {
@@ -15,7 +10,7 @@ namespace SocuciusErgallaBot.Modules
     {
         private Random random = new Random();
 
-        [Command("join")]
+        [Command("join", RunMode = RunMode.Async)]
         [Summary("Instructs the bot to join the voice channel you are in")]
         public async Task JoinCommand()
         {
@@ -27,7 +22,7 @@ namespace SocuciusErgallaBot.Modules
         {
             SocketGuild guild = GetMutualGuild();
             var voiceChannel = guild.VoiceChannels.Where(x => x.Users.Any(y => y.Id == Context.Message.Author.Id)).FirstOrDefault();
-            var response = await AudioManager.JoinAsync(guild, voiceChannel, Context.Channel as ITextChannel);
+            var response = await AudioManager.JoinAsync(voiceChannel, guild);
             return response;
         }
 
@@ -37,8 +32,8 @@ namespace SocuciusErgallaBot.Modules
             return guild;
         }
 
-        [Command("play")]
-        [Summary("Plays a video from youtube using a url or search terms")]
+        [Command("play", RunMode = RunMode.Async)]
+        [Summary("Plays audio from youtube using a url or search terms")]
         public async Task PlayCommand([Remainder] string search)
         {
             var response = await PlayTrack(search);
@@ -144,17 +139,17 @@ namespace SocuciusErgallaBot.Modules
 
         [Command("toptracks")]
         [Alias("top")]
-        [Summary("Lists top tracks played by the bot")]
-        public async Task TopTracksCommand()
+        [Summary("Lists top tracks played by the bot with user specified amount (top 10, 20, etc)")]
+        public async Task TopTracksCommand([Remainder]int count)
         {
             var tracks = await DatabaseManager.GetTrackHistoriesAsync();
-            tracks = tracks.OrderBy(x => x.Plays).Take(10).ToList();
+            tracks = tracks.OrderByDescending(x => x.Plays).Take(count).ToList();
             string topTracks = string.Empty;
             for (int i = 0; i < tracks.Count; i++)
             {
-                topTracks += $"{i + 1}. {tracks[i].Title}\n\tPlays: {tracks[i].Plays}\n\t\t{tracks[i].URL}\n";
+                topTracks += $"\n{i + 1}. {tracks[i].Title}\n\tPlays: {tracks[i].Plays}\n";
             }
-            await Context.Channel.SendMessageAsync($"Top Tracks:\n\n{topTracks}");
+            await Context.Channel.SendMessageAsync($"Top Tracks:{topTracks}");
         }
 
         [Command("random")]

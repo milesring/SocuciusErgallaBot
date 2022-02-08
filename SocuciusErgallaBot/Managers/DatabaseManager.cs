@@ -1,10 +1,5 @@
 ﻿using SocuciusErgallaBot.Models;
-using System;
-using System.Collections.Generic;
 using System.Data.SQLite;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SocuciusErgallaBot.Managers
 {
@@ -14,6 +9,11 @@ namespace SocuciusErgallaBot.Managers
         private static string _trackTableName = "tracks";
         private static string _userTableName = "users";
         private static string _userPlaysTableName = "user_plays";
+
+        static DatabaseManager()
+        {
+            Task.Run(async()=>await CreateTables());
+        }
         private static async Task CreateTables()
         {
             using (_connection = new SQLiteConnection(ConfigManager.Config.HistoryDatabase))
@@ -46,7 +46,6 @@ namespace SocuciusErgallaBot.Managers
 
         public static async Task<List<TrackHistory>> GetTrackHistoriesAsync()
         {
-            await CreateTables();
             using (_connection = new SQLiteConnection(ConfigManager.Config.HistoryDatabase))
             {
                 await _connection.OpenAsync();
@@ -88,7 +87,6 @@ namespace SocuciusErgallaBot.Managers
 
         public static async Task<TrackHistory> GetTrackHistoryAsync(TrackHistory trackHistory)
         {
-            await CreateTables();
             using (_connection = new SQLiteConnection(ConfigManager.Config.HistoryDatabase))
             {
                 await _connection.OpenAsync();
@@ -125,7 +123,6 @@ namespace SocuciusErgallaBot.Managers
 
         public static async Task<User> GetUserHistoryAsync(User user)
         {
-            await CreateTables();
             using (_connection = new SQLiteConnection(ConfigManager.Config.HistoryDatabase))
             {
                 await _connection.OpenAsync();
@@ -146,8 +143,6 @@ namespace SocuciusErgallaBot.Managers
 
         public static async Task InsertTrackPlayAsync(TrackHistory trackHistory)
         {
-            await CreateTables();
-
             //User Info
             await GetUserHistoryAsync(trackHistory.User);
             if (trackHistory.User.Id == 0)

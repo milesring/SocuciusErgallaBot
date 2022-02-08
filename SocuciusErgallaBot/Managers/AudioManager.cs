@@ -1,12 +1,7 @@
 ﻿using Discord;
 using Discord.WebSocket;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Victoria;
 using Victoria.Enums;
 using Victoria.EventArgs;
@@ -58,7 +53,7 @@ namespace SocuciusErgallaBot.Managers
             await arg.Player.SeekAsync(trackInfo.StartTime);
         }
 
-        public static async Task<MusicResponse> JoinAsync(IGuild guild, IVoiceChannel voiceChannel, ITextChannel channel)
+        public static async Task<MusicResponse> JoinAsync(IVoiceChannel voiceChannel, IGuild guild)
         {
             if (_lavaNode.HasPlayer(guild))
             {
@@ -69,17 +64,17 @@ namespace SocuciusErgallaBot.Managers
                 };
 
                 var player = _lavaNode.GetPlayer(guild);
-                if(player.VoiceChannel.Id == voiceChannel.Id)
+                if (player.VoiceChannel.Id == voiceChannel.Id)
                 {
                     return response;
                 }
-                var users = await player.VoiceChannel.GetUsersAsync(CacheMode.CacheOnly, new RequestOptions { AuditLogReason = "Bot checking for user count in current voice channel."}).ToListAsync();
-                if(users.Count == 1)
+                var users = await player.VoiceChannel.GetUsersAsync(CacheMode.CacheOnly, new RequestOptions { AuditLogReason = "Bot checking for user count in current voice channel." }).ToListAsync();
+                if (users.Count == 1)
                 {
                     await LeaveAsync(player.VoiceChannel, guild);
                     //leave channel
                 }
-                
+
             }
             if (voiceChannel is null) return new MusicResponse()
             {
@@ -88,7 +83,7 @@ namespace SocuciusErgallaBot.Managers
             };
             try
             {
-                await _lavaNode.JoinAsync(voiceChannel, channel);
+                await _lavaNode.JoinAsync(voiceChannel);
                 var player = _lavaNode.GetPlayer(guild);
                 await player.UpdateVolumeAsync((ushort)_defaultVolume);
                 return new MusicResponse()
@@ -122,7 +117,7 @@ namespace SocuciusErgallaBot.Managers
             if (!_lavaNode.HasPlayer(guild))
                 return new MusicResponse()
                 {
-                    Message = "I'm not connected to the voice channel",
+                    Message = "Bot not connected to the voice channel",
                     Status = MusicResponseStatus.Error
                 };
 
@@ -142,7 +137,13 @@ namespace SocuciusErgallaBot.Managers
 
                 if (search.Status == Victoria.Responses.Search.SearchStatus.NoMatches) return new MusicResponse()
                 {
-                    Message = $"I could not locate anything for {query}",
+                    Message = $"Could not locate anything for {query}",
+                    Status = MusicResponseStatus.Error
+                };
+
+                if (search.Status == Victoria.Responses.Search.SearchStatus.LoadFailed) return new MusicResponse()
+                {
+                    Message = $"Failed to load video for {query}",
                     Status = MusicResponseStatus.Error
                 };
 
@@ -176,7 +177,7 @@ namespace SocuciusErgallaBot.Managers
                     {
                         Title = track.Title,
                         Author = track.Author,
-                        URL = track.Url, 
+                        URL = track.Url,
                         User = new Models.User()
                         {
                             Username = user.Username,
@@ -209,9 +210,15 @@ namespace SocuciusErgallaBot.Managers
                         DiscordId = user.Id.ToString()
                     }
                 });
+                var message = $"Now playing: {track.Title} - {track.Author}";
+                if(startTime != TimeSpan.Zero)
+                {
+                    message = $"{message} at {startTime:c}";
+                }
+
                 return new MusicResponse()
                 {
-                    Message = $"{track.Title} - {track.Author} at {startTime:c}",
+                    Message = message,
                     Status = MusicResponseStatus.Valid
                 };
 
@@ -275,14 +282,14 @@ namespace SocuciusErgallaBot.Managers
             try
             {
                 var player = _lavaNode.GetPlayer(guild);
-                if(!CheckIfUserInSameVoiceChannel(voiceChannel, player.VoiceChannel))
+                if (!CheckIfUserInSameVoiceChannel(voiceChannel, player.VoiceChannel))
                     return new MusicResponse()
                     {
                         Message = "You must be in the same voice channel to command the bot.",
                         Status = MusicResponseStatus.Error
                     };
 
-                if (player.PlayerState is PlayerState.Playing) 
+                if (player.PlayerState is PlayerState.Playing)
                     await player.StopAsync();
 
                 await _lavaNode.LeaveAsync(player.VoiceChannel);
@@ -290,7 +297,7 @@ namespace SocuciusErgallaBot.Managers
                 _queuedTracks.Clear();
                 return new MusicResponse()
                 {
-                    Message = "I have left the voice channel",
+                    Message = "Bot left the voice channel",
                     Status = MusicResponseStatus.Valid
                 };
             }
@@ -302,7 +309,7 @@ namespace SocuciusErgallaBot.Managers
                     Status = MusicResponseStatus.Error
                 };
             }
-        } 
+        }
 
         public static async Task<MusicResponse> SetVolumeAsync(IVoiceChannel voiceChannel, IGuild guild, int volume)
         {
