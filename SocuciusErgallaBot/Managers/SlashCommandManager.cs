@@ -434,7 +434,6 @@ namespace SocuciusErgallaBot.Managers
             }
         }
 
-        //TODO: Add seek function with % skip or time
         private static async Task HandleSeekCommand(SocketSlashCommand command)
         {
             var user = (SocketGuildUser)command.User;
