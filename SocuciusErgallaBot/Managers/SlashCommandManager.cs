@@ -22,9 +22,11 @@ namespace SocuciusErgallaBot.Managers
             applicationCommandProperties.Add(BuildRemoveCommand());
             applicationCommandProperties.Add(BuildTopCommand());
             applicationCommandProperties.Add(BuildPlayRandomCommand());
+            applicationCommandProperties.Add(BuildSeekCommand());
 
             try
             {
+                await guild.DeleteApplicationCommandsAsync();
                 await guild.BulkOverwriteApplicationCommandAsync(applicationCommandProperties.ToArray());
             }
             catch (HttpException ex)
@@ -97,14 +99,24 @@ namespace SocuciusErgallaBot.Managers
             var commandProperties = new SlashCommandBuilder();
             commandProperties.WithName("top")
                 .WithDescription("Lists top tracks played by the bot with user specified amount.")
-                .AddOption("number", ApplicationCommandOptionType.Integer, "The number of the track to be displayed.", isRequired: true, minValue:0, maxValue:100);
+                .AddOption("number", ApplicationCommandOptionType.Integer, "The number of the track to be displayed.", isRequired: true, minValue: 0, maxValue: 100);
             return commandProperties.Build();
         }
         private static ApplicationCommandProperties BuildPlayRandomCommand()
         {
             var commandProperties = new SlashCommandBuilder();
             commandProperties.WithName("playrandom")
-                .WithDescription("Plays a random track that has been played before.");
+                .WithDescription("Plays a random track that has been played before.")
+                .AddOption("amount", ApplicationCommandOptionType.Integer, "The number of random tracks to add to the queue.", isRequired: false, minValue: 1, maxValue: 20);
+            return commandProperties.Build();
+        }
+
+        private static ApplicationCommandProperties BuildSeekCommand()
+        {
+            var commandProperties = new SlashCommandBuilder();
+            commandProperties.WithName("seek")
+                .WithDescription("Seeks to a location in the currently playing song.")
+                .AddOption("percentage", ApplicationCommandOptionType.Number, "The location of the song to seek to using a percentage of the total song.", isRequired: true, minValue: 0, maxValue: 100);
             return commandProperties.Build();
         }
 
@@ -144,7 +156,9 @@ namespace SocuciusErgallaBot.Managers
                 case "playrandom":
                     await HandlePlayRandomCommand(command).ConfigureAwait(false);
                     break;
-
+                case "seek":
+                    await HandleSeekCommand(command).ConfigureAwait(false);
+                    break;
             }
         }
 
@@ -169,9 +183,17 @@ namespace SocuciusErgallaBot.Managers
             {
                 EventManager.StopNowPlayingTimer();
                 var embedBuilder = new EmbedBuilder()
-                .WithDescription(response.Message)
-                .WithColor(Color.Green)
-                .WithCurrentTimestamp();
+                    .WithDescription(response.Message)
+                    .WithColor(Color.Green)
+                    .WithCurrentTimestamp();
+                await command.ModifyOriginalResponseAsync((prop) => prop.Embed = embedBuilder.Build());
+            }
+            else
+            {
+                var embedBuilder = new EmbedBuilder()
+                    .WithDescription(response.Message)
+                    .WithColor(Color.Red)
+                    .WithCurrentTimestamp();
                 await command.ModifyOriginalResponseAsync((prop) => prop.Embed = embedBuilder.Build());
             }
         }
@@ -187,7 +209,7 @@ namespace SocuciusErgallaBot.Managers
             var guild = user.Guild;
             var voiceChannel = GetVoiceChannel(user, guild);
             var response = await AudioManager.LeaveAsync(voiceChannel, guild);
-            if(response.Status == MusicResponseStatus.Valid)
+            if (response.Status == MusicResponseStatus.Valid)
             {
                 await EventManager.SetNowPlayingTimer();
                 var embedBuilder = new EmbedBuilder()
@@ -299,7 +321,7 @@ namespace SocuciusErgallaBot.Managers
         {
             var user = (SocketGuildUser)command.User;
             var guild = user.Guild;
-            var response = await Task.Run(()=>AudioManager.GetNowPlaying(guild));
+            var response = await Task.Run(() => AudioManager.GetNowPlaying(guild));
             var embedBuilder = new EmbedBuilder()
                     .WithDescription(response)
                     .WithColor(Color.Green)
@@ -350,8 +372,6 @@ namespace SocuciusErgallaBot.Managers
 
         private static async Task HandlePlayRandomCommand(SocketSlashCommand command)
         {
-            var tracks = await DatabaseManager.GetTrackHistoriesAsync();
-            var track = tracks[random.Next(tracks.Count)];
 
             var user = (SocketGuildUser)command.User;
             var guild = user.Guild;
@@ -367,21 +387,77 @@ namespace SocuciusErgallaBot.Managers
                 await command.ModifyOriginalResponseAsync((prop) => prop.Embed = embedBuilder.Build());
                 return;
             }
-            response = await AudioManager.PlayAsync(voiceChannel, guild, track.URL, user);
-            if (response.Status != MusicResponseStatus.Error)
+
+            var success = int.TryParse(command.Data.Options.FirstOrDefault()?.Value.ToString(), out int numTracks);
+            numTracks = success ? numTracks : 1;
+            var trackQuery = await DatabaseManager.GetTrackHistoriesAsync();
+            var tracks = new List<Models.TrackHistory>(trackQuery);
+            List<MusicResponse> responseList = new();
+            for (int i = 0; i < numTracks; i++)
             {
+                var track = tracks[random.Next(tracks.Count)];
+                tracks.Remove(track);
+                var randomPlayResponse = await AudioManager.PlayAsync(voiceChannel, guild, track.URL, user);
+                responseList.Add(randomPlayResponse);
+            }
+
+            if (responseList.All(x => x.Status == MusicResponseStatus.Valid))
+            {
+                var responseMessage = string.Empty;
+
+                foreach(var successResponse in responseList)
+                {
+                    responseMessage += $"{responseList.IndexOf(successResponse)+1}. - {successResponse.Message}\n\n";
+                }
                 EventManager.StopNowPlayingTimer();
                 var embedBuilder = new EmbedBuilder()
-                .WithDescription(response.Message)
+                .WithDescription(responseMessage)
                 .WithColor(Color.Green)
                 .WithCurrentTimestamp();
                 await command.ModifyOriginalResponseAsync((prop) => prop.Embed = embedBuilder.Build());
             }
+            else
+            {
+                var failedResponses = responseList.Where(x => x.Status == MusicResponseStatus.Error).ToList();
+                var responseMessage = string.Empty;
+                foreach (var failedResponse in failedResponses)
+                {
+                    responseMessage += $"{failedResponses.IndexOf(failedResponse)+1}. - {failedResponse.Message}\n\n";
+                }
+                var embedBuilder = new EmbedBuilder()
+                .WithTitle(nameof(MusicResponseStatus.Error))
+                .WithDescription(responseMessage)
+                .WithColor(Color.Red)
+                .WithCurrentTimestamp();
+                await command.ModifyOriginalResponseAsync((prop) => prop.Embed = embedBuilder.Build());
+                return;
+            }
         }
 
-        private static async Task RespondToCommand(MusicResponse status)
+        //TODO: Add seek function with % skip or time
+        private static async Task HandleSeekCommand(SocketSlashCommand command)
         {
-
+            var user = (SocketGuildUser)command.User;
+            var guild = user.Guild;
+            var voiceChannel = GetVoiceChannel(user, guild);
+            var response = await AudioManager.SeekAsync(voiceChannel, guild, Convert.ToInt32(command.Data.Options.First().Value));
+            if (response.Status == MusicResponseStatus.Valid)
+            {
+                var embedBuilder = new EmbedBuilder()
+                    .WithDescription(response.Message)
+                    .WithColor(Color.Green)
+                    .WithCurrentTimestamp();
+                await command.ModifyOriginalResponseAsync((prop) => prop.Embed = embedBuilder.Build());
+            }
+            else
+            {
+                var embedBuilder = new EmbedBuilder()
+                    .WithTitle(nameof(MusicResponseStatus.Error))
+                    .WithDescription(response.Message)
+                    .WithColor(Color.Red)
+                    .WithCurrentTimestamp();
+                await command.ModifyOriginalResponseAsync((prop) => prop.Embed = embedBuilder.Build());
+            }
         }
     }
 }

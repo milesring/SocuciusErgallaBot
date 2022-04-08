@@ -43,8 +43,6 @@ namespace SocuciusErgallaBot
             {
                 return;
             }
-            
-            await CommandManager.LoadCommandsAsync();
             await EventManager.LoadCommands();
 
             await _client.LoginAsync(Discord.TokenType.Bot, ConfigManager.Config.Token);

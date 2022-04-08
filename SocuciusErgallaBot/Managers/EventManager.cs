@@ -29,7 +29,6 @@ namespace SocuciusErgallaBot.Managers
             };
 
             _client.Ready += OnReady;
-            _client.MessageReceived += OnMessageReceived;
             _client.UserVoiceStateUpdated += _client_UserVoiceStateUpdated;
             _client.SlashCommandExecuted += SlashCommandManager.HandleSlashCommand;
             return Task.CompletedTask;
@@ -51,9 +50,10 @@ namespace SocuciusErgallaBot.Managers
             try
             {
                 playerChannel = AudioManager.GetCurrentChannel(mutualGuild).Result;
-            }catch (KeyNotFoundException)
+            }catch (KeyNotFoundException e)
             {
                 //no player found
+                Console.WriteLine($"{e.Message} No player currently in channel.");
                 return;
             }
             if(_stopMusicTimer?.Enabled == true && playerChannel == arg3.VoiceChannel)
@@ -68,23 +68,6 @@ namespace SocuciusErgallaBot.Managers
             }
         }
 
-        private static async Task OnMessageReceived(SocketMessage arg)
-        {
-            var message = arg as SocketUserMessage;
-            var context = new SocketCommandContext(_client, message);
-            if (message.Author.IsBot || message.Channel is not IDMChannel) return;
-
-            var argPos = 0;
-
-            if (!(message.HasStringPrefix(ConfigManager.Config.Prefix, ref argPos) || message.HasMentionPrefix(_client.CurrentUser, ref argPos))) return;
-
-            var result = await _commandService.ExecuteAsync(context, argPos, ServiceManager.Provider);
-
-            if (!result.IsSuccess)
-            {
-                if (result.Error == CommandError.UnknownCommand) return;
-            }
-        }
 
         private static async Task OnReady()
         {

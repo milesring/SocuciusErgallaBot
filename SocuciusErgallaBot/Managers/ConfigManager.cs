@@ -6,8 +6,11 @@ namespace SocuciusErgallaBot.Managers
     {
         private static string ConfigFolder = "Resources";
         private static string ConfigFile = "config.json";
+        private static string ServerInfo = "tes3mpserverinfo.json";
         private static string ConfigPath = Path.Join(ConfigFolder, ConfigFile);
+        private static string ServerPath = Path.Join(ConfigFolder, ServerInfo);
         public static BotConfig Config { get; private set; }
+        public static TES3MPServer TES3MPServer { get; private set; }
 
         static ConfigManager()
         {
@@ -27,6 +30,18 @@ namespace SocuciusErgallaBot.Managers
                 var json = File.ReadAllText(ConfigPath);
                 Config = JsonConvert.DeserializeObject<BotConfig>(json);
             }
+
+            if (!File.Exists(ServerPath))
+            {
+                TES3MPServer = new TES3MPServer();
+                var json = JsonConvert.SerializeObject(TES3MPServer, Formatting.Indented);
+                File.WriteAllText(ServerPath, json);
+            }
+            else
+            {
+                var json = File.ReadAllText(ServerPath);
+                TES3MPServer = JsonConvert.DeserializeObject<TES3MPServer>(json);
+            }
         }
     }
 
@@ -35,13 +50,18 @@ namespace SocuciusErgallaBot.Managers
         //bot token for authentication from Discord
         [JsonProperty("token")]
         public string Token { get; private set; }
-        //prefix used in calling commands. !m, !bot, bot, etc.
-        [JsonProperty("prefix")]
-        public string Prefix { get; private set; }
         //name of database
         [JsonProperty("historydatabase")]
         public string HistoryDatabase { get; private set; }
+    }
 
-
+    internal struct TES3MPServer
+    {
+        [JsonProperty("serverinfo")]
+        public string[] ServerInfo { get; private set; }
+        public string[] InstallInstructions { get; private set; }
+        public string[] FallbackArchives { get; private set; }
+        public string InstallDirectory { get;private set; }
+        public string[] Mods { get; private set; }
     }
 }

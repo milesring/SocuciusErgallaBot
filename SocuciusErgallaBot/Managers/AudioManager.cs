@@ -143,7 +143,7 @@ namespace SocuciusErgallaBot.Managers
 
                 if (search.Status == Victoria.Responses.Search.SearchStatus.LoadFailed) return new MusicResponse()
                 {
-                    Message = $"Failed to load video for {query}",
+                    Message = $"Failed to load video for {query}:\n{search.Exception.Message}",
                     Status = MusicResponseStatus.Error
                 };
 
@@ -188,7 +188,7 @@ namespace SocuciusErgallaBot.Managers
                     Console.WriteLine($"({DateTime.Now}\t(AUDIO)\tTrack was added to queue");
                     return new MusicResponse()
                     {
-                        Message = $"{track.Title} - {track.Author} has been added to queue",
+                        Message = $"Added to Queue: {track.Title} - {track.Author}",
                         Status = MusicResponseStatus.Valid
                     };
                 }
@@ -448,6 +448,51 @@ namespace SocuciusErgallaBot.Managers
             }
         }
 
+        public static async Task<MusicResponse> SeekAsync(IVoiceChannel voiceChannel, IGuild guild, int percent)
+        {
+            int min = 0, max = 100;
+            if (percent > max || percent <= min) return new MusicResponse()
+            {
+                Message = $"Seek percentage must be between {min} and {max}",
+                Status = MusicResponseStatus.Error
+            };
+
+            try
+            {
+                var player = _lavaNode.GetPlayer(guild);
+
+                if (!CheckIfUserInSameVoiceChannel(voiceChannel, player.VoiceChannel))
+                    return new MusicResponse()
+                    {
+                        Message = "You must be in the same voice channel to command the bot.",
+                        Status = MusicResponseStatus.Error
+                    };
+                if(player.PlayerState == PlayerState.Playing || player.PlayerState == PlayerState.Paused)
+                {
+                    var newPosition = TimeSpan.FromMilliseconds(player.Track.Duration.TotalMilliseconds * ((double)percent/100));
+                    await player.SeekAsync(newPosition);
+                    return new MusicResponse()
+                    {
+                        Message = $"Player position has been set to {newPosition.ToString("g")}/{player.Track.Duration.ToString("g")}",
+                        Status = MusicResponseStatus.Valid
+                    };
+                }
+                return new MusicResponse()
+                {
+                    Message = $"Seek invalid in current player state.{player.PlayerState}",
+                    Status = MusicResponseStatus.Error
+                };
+            }
+            catch (Exception ex)
+            {
+                return new MusicResponse()
+                {
+                    Message = ex.Message,
+                    Status = MusicResponseStatus.Error
+                };
+            }
+        }
+
         public static Task<string> GetQueue(IGuild guild)
         {
             try
@@ -499,7 +544,7 @@ namespace SocuciusErgallaBot.Managers
 
         private static bool CheckIfUserInSameVoiceChannel(IVoiceChannel userChannel, IVoiceChannel botChannel)
         {
-            return botChannel.Id == userChannel.Id;
+            return botChannel?.Id == userChannel?.Id;
         }
     }
 
